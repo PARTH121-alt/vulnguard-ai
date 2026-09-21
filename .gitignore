@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Node
+node_modules/
+frontend/build/
+frontend/.env.local
+
+# ML Models (large files)
+ml/models/*.joblib
+ml/models/*.pkl
+ml/models/*.pt
+models/*.joblib
+models/*.pkl
+
+# Database
+*.db
+*.sqlite3
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Jupyter
+.ipynb_checkpoints/
