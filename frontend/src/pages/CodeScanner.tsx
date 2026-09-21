@@ -90,7 +90,7 @@ const languages = [
 const models = [
   { id: 'random_forest', label: 'Random Forest', desc: 'Ensemble learning method' },
   { id: 'xgboost', label: 'XGBoost', desc: 'Gradient boosting framework' },
-  { id: 'codebert', label: 'CodeBERT', desc: 'Transformer model (demo)', disabled: true },
+  { id: 'codebert', label: 'CodeBERT', desc: 'Code-aware model (80+ features)' },
   { id: 'ensemble', label: 'Ensemble', desc: 'Combined predictions' },
 ];
 
@@ -251,10 +251,10 @@ export default function CodeScanner() {
                   <label className="block text-xs text-slate-400 mb-2">Model</label>
                   <div className="space-y-1.5">
                     {models.map(m => (
-                      <button key={m.id} onClick={() => !m.disabled && setSelectedModel(m.id)} disabled={m.disabled}
+                      <button key={m.id} onClick={() => setSelectedModel(m.id)}
                         className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-sm transition-all
                           ${selectedModel === m.id ? 'text-cyan-400' : 'text-slate-400 hover:text-slate-200'}
-                          ${m.disabled ? 'opacity-40 cursor-not-allowed' : 'hover:bg-white/5'}
+                          hover:bg-white/5
                           ${selectedModel === m.id ? 'bg-cyan-500/10' : ''}`}
                         style={selectedModel === m.id ? { border: '1px solid rgba(0, 212, 255, 0.3)' } : { border: '1px solid transparent' }}>
                         <div className={`w-2 h-2 rounded-full ${selectedModel === m.id ? 'bg-cyan-400' : 'bg-slate-600'}`} />

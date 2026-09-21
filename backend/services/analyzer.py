@@ -5,6 +5,12 @@ from typing import Dict, List, Any, Optional
 from backend.services.preprocessor import preprocess_code
 from backend.services.feature_extractor import extract_features, DANGEROUS_PATTERNS
 
+try:
+    from ml.codebert_model import predict_codebert, explain_codebert, extract_codebert_features
+    CODEBERT_AVAILABLE = True
+except ImportError:
+    CODEBERT_AVAILABLE = False
+
 
 VULNERABILITY_CATEGORIES = {
     "sql_injection": {
@@ -47,6 +53,56 @@ VULNERABILITY_CATEGORIES = {
         "cwe": "CWE-120",
         "description": "Unbounded memory writes that can corrupt adjacent memory",
     },
+    "ssrf": {
+        "name": "Server-Side Request Forgery (SSRF)",
+        "cwe": "CWE-918",
+        "description": "Server makes requests to user-controlled URLs",
+    },
+    "xxe": {
+        "name": "XML External Entity (XXE)",
+        "cwe": "CWE-611",
+        "description": "XML parser processes external entities from untrusted input",
+    },
+    "open_redirect": {
+        "name": "Open Redirect",
+        "cwe": "CWE-601",
+        "description": "Application redirects users to unvalidated external URLs",
+    },
+    "weak_cryptography": {
+        "name": "Weak Cryptography",
+        "cwe": "CWE-327",
+        "description": "Use of broken or weak cryptographic algorithms",
+    },
+    "race_condition": {
+        "name": "Race Condition",
+        "cwe": "CWE-362",
+        "description": "Concurrent access to shared resources without proper synchronization",
+    },
+    "resource_exhaustion": {
+        "name": "Resource Exhaustion",
+        "cwe": "CWE-400",
+        "description": "Uncontrolled resource consumption leading to denial of service",
+    },
+    "denial_of_service": {
+        "name": "Denial of Service",
+        "cwe": "CWE-400",
+        "description": "Conditions causing service unavailability",
+    },
+    "code_injection": {
+        "name": "Code Injection",
+        "cwe": "CWE-94",
+        "description": "User input used to dynamically generate and execute code",
+    },
+    "log_injection": {
+        "name": "Log Injection",
+        "cwe": "CWE-117",
+        "description": "Unsanitized input written to application logs",
+    },
+    "xml_injection": {
+        "name": "XML Injection",
+        "cwe": "CWE-91",
+        "description": "Untrusted data injected into XML documents or parsers",
+    },
 }
 
 SEVERITY_MAP = {
@@ -58,6 +114,16 @@ SEVERITY_MAP = {
     "path_traversal": "high",
     "xss": "medium",
     "authentication_bypass": "high",
+    "ssrf": "high",
+    "xxe": "high",
+    "open_redirect": "medium",
+    "weak_cryptography": "medium",
+    "race_condition": "medium",
+    "resource_exhaustion": "medium",
+    "denial_of_service": "medium",
+    "code_injection": "critical",
+    "log_injection": "low",
+    "xml_injection": "medium",
 }
 
 CONFIDENCE_MAP = {
@@ -69,6 +135,16 @@ CONFIDENCE_MAP = {
     "insecure_deserialization": 0.85,
     "authentication_bypass": 0.72,
     "buffer_overflow": 0.87,
+    "ssrf": 0.80,
+    "xxe": 0.83,
+    "open_redirect": 0.76,
+    "weak_cryptography": 0.90,
+    "race_condition": 0.65,
+    "resource_exhaustion": 0.70,
+    "denial_of_service": 0.68,
+    "code_injection": 0.89,
+    "log_injection": 0.74,
+    "xml_injection": 0.81,
 }
 
 
@@ -124,9 +200,45 @@ def analyze_code(
     feature_data = extract_features(source_code, language)
     feature_importance = _generate_feature_importance(feature_data, detected_categories)
 
+    codebert_result = None
+    codebert_explanation = None
+    if model_name == "codebert" and CODEBERT_AVAILABLE:
+        try:
+            codebert_result = predict_codebert(source_code, language)
+            if codebert_result.get("vulnerability_detected") and not vulnerability_detected:
+                vulnerability_detected = True
+                if not primary_type:
+                    primary_type = "Code Pattern Vulnerability"
+                if not max_severity:
+                    max_severity = "medium"
+                overall_confidence = max(overall_confidence, codebert_result.get("confidence", 0))
+            if explain:
+                codebert_explanation = explain_codebert(source_code, language)
+        except Exception:
+            pass
+
     explanation = None
     if explain:
         explanation = _generate_explanation_summary(findings, feature_data, detected_categories)
+        if codebert_explanation:
+            explanation["codebert_analysis"] = codebert_explanation
+
+    model_display = model_name
+    is_demo = True
+    if model_name == "codebert":
+        if CODEBERT_AVAILABLE and codebert_result and not codebert_result.get("is_demo", True):
+            model_display = "codebert (trained)"
+            is_demo = False
+        else:
+            model_display = "codebert (code-aware features)"
+    elif model_name in ("random_forest", "xgboost"):
+        model_path = f"./ml/models/{model_name}.joblib"
+        import os
+        if os.path.exists(model_path):
+            model_display = f"{model_name} (trained)"
+            is_demo = False
+        else:
+            model_display = f"{model_name} (demo pattern-matching)"
 
     return {
         "status": "completed",
@@ -138,8 +250,9 @@ def analyze_code(
         "highlighted_lines": highlighted_lines,
         "explanation": explanation,
         "feature_importance": feature_importance,
-        "model_used": f"{model_name} (demo pattern-matching)",
-        "is_demo": True,
+        "model_used": model_display,
+        "is_demo": is_demo,
+        "codebert_result": codebert_result,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -315,6 +428,16 @@ def _generate_recommendations(categories: set) -> List[str]:
         "insecure_deserialization": "Avoid deserializing untrusted data. If necessary, use safe alternatives like yaml.SafeLoader.",
         "authentication_bypass": "Implement proper authentication checks on all sensitive endpoints.",
         "buffer_overflow": "Use safe string functions with bounds checking. Consider using higher-level languages or safe alternatives.",
+        "ssrf": "Validate and whitelist allowed URLs before making server-side requests. Use network segmentation to limit outbound connections.",
+        "xxe": "Disable external entity processing in XML parsers. Use defusedxml library. Prefer JSON over XML.",
+        "open_redirect": "Validate redirect URLs against an allowlist of trusted domains. Never redirect to user-supplied URLs without validation.",
+        "weak_cryptography": "Use modern algorithms like AES-256-GCM, SHA-256+, or bcrypt/scrypt for password hashing. Never use MD5/SHA1 for security.",
+        "race_condition": "Use locks, semaphores, or atomic operations to synchronize access to shared resources.",
+        "resource_exhaustion": "Implement rate limiting, request timeouts, and resource quotas. Use connection pooling and circuit breakers.",
+        "denial_of_service": "Set appropriate timeouts and rate limits. Implement graceful degradation and health checks.",
+        "code_injection": "Never execute dynamic code from user input. Use parameterized approaches and sandboxing.",
+        "log_injection": "Sanitize all input before writing to logs. Use structured logging formats (JSON).",
+        "xml_injection": "Validate XML input against a schema. Disable DTD processing. Use safe XML parsers.",
     }
     for cat in categories:
         if cat in rec_map:

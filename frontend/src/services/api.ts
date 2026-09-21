@@ -48,6 +48,7 @@ export const analysisAPI = {
     api.get(`/history?skip=${skip}&limit=${limit}`),
   getAnalysis: (id: number) => api.get(`/history/${id}`),
   deleteAnalysis: (id: number) => api.delete(`/history/${id}`),
+  getCorrections: (id: number) => api.get(`/corrections/${id}`),
   getModels: () => api.get('/models'),
   healthCheck: () => api.get('/health'),
 };

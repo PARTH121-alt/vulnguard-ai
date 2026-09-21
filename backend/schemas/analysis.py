@@ -20,6 +20,7 @@ class Finding(BaseModel):
 
 
 class AnalysisResponse(BaseModel):
+    id: int
     status: str
     vulnerability_detected: bool
     vulnerability_type: Optional[str] = None

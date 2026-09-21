@@ -24,6 +24,7 @@ export default function History() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [sortBy, setSortBy] = useState('timestamp');
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
+  const [deleteAllConfirm, setDeleteAllConfirm] = useState(false);
 
   useEffect(() => { loadHistory(); }, []);
 
@@ -46,6 +47,18 @@ export default function History() {
       toast.success('Analysis deleted');
     } catch (err) {
       toast.error('Failed to delete');
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    try {
+      const promises = filtered.map(item => analysisAPI.deleteAnalysis(item.id));
+      await Promise.all(promises);
+      setItems(items.filter(i => !filtered.find(f => f.id === i.id)));
+      setDeleteAllConfirm(false);
+      toast.success(`Deleted ${filtered.length} analyses`);
+    } catch (err) {
+      toast.error('Failed to delete some analyses');
     }
   };
 
@@ -117,8 +130,32 @@ export default function History() {
               <option value="timestamp">Newest First</option>
               <option value="confidence">Highest Confidence</option>
             </select>
+            {items.length > 0 && (
+              <button onClick={() => setDeleteAllConfirm(true)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-red-400 hover:bg-red-500/10 transition-all"
+                style={{ border: '1px solid rgba(255, 71, 87, 0.2)' }}>
+                <Trash2 className="w-4 h-4" /> Delete All
+              </button>
+            )}
           </div>
         </div>
+
+        {deleteAllConfirm && (
+          <div className="rounded-xl p-4 mb-6 flex items-center justify-between"
+            style={{ background: 'rgba(255, 71, 87, 0.1)', border: '1px solid rgba(255, 71, 87, 0.3)' }}>
+            <span className="text-sm text-red-300">Delete all {filtered.length} analysis records? This cannot be undone.</span>
+            <div className="flex items-center gap-2">
+              <button onClick={handleDeleteAll}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-red-500 hover:bg-red-600 transition-all">
+                Delete All
+              </button>
+              <button onClick={() => setDeleteAllConfirm(false)}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition-all">
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
 
         {loading ? (
           <div className="space-y-3">
